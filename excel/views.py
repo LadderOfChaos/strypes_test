@@ -1,32 +1,66 @@
-from django.shortcuts import render
-from .forms import CsvModelForm
+from django.shortcuts import render, redirect
+from .forms import XlsxModelForm, EditForm
 from .models import Xlsx, XlsxData
-import csv
-
+import openpyxl
+from datetime import datetime
 
 def upload_file_view(request):
-    form = CsvModelForm(request.POST or None, request.FILES or None)
+    form = XlsxModelForm(request.POST or None, request.FILES or None)
     if form.is_valid():
         form.save()
-        form = CsvModelForm()
+        form =XlsxModelForm(request.POST, request.FILES)
         obj = Xlsx.objects.get(activated=False)
-        with open(obj.file_name.path, 'r') as f:
-            reader = csv.reader(f)
-            for i, row in enumerate(reader):
-                if i == 0:
-                    pass
+        excel_file = request.FILES['file_name']
+        wb = openpyxl.load_workbook(excel_file)
+        ws = wb.active
+        excel_data = []
+        for i, row in enumerate(ws.iter_rows(min_row=2, max_row=ws.max_row), start=2):
+            row_data = []
+            for cell in row:
+                if cell.value == "Position*":
+                    continue
+                if cell.value:
+                    row_data.append(cell.value)
                 else:
-                    row = ''.join(row)
-                    row = row.replace(";", " ")
-                    row = row.split()
-                    XlsxData.objects.create(
-                        First_name=row[0],
-                        Last_name=row[1],
-                        Mobile=row[2],
-                        Start_date=row[3],
-                        Salary=row[5],
-                        Employee_ID=row[6],
-                    )
-            obj.activated = True
-            obj.save()
-    return render(request, 'excel/upload.html', {'form': form})
+                    break
+            excel_data.append(row_data)
+        for i in range(len(excel_data)):
+            XlsxData.objects.create(
+                First_name=excel_data[i][0],
+                Last_name = excel_data[i][1],
+                Mobile = excel_data[i][2],
+                Start_date = '2012-02-03',
+                #int(datetime(excel_data[i][3]).strftime("#y/#%m/%d")),
+                Salary = excel_data[i][5],
+                Employee_ID = excel_data[i][6],
+
+            )
+
+        obj.activated = True
+        obj.save()
+    contex = {
+        'form': form,
+        'Xlsx': XlsxData.objects.order_by('-id'),
+    }
+    return render(request, 'excel/upload.html', contex)
+
+
+def edit_details(request, pk):
+    person = XlsxData.objects.get(pk=pk)
+    if request.method == "GET":
+        form = EditForm(instance=person)
+        context = {
+            'form': form,
+            'person': person,
+        }
+        return render(request, 'excel/edit.html', context)
+    else:
+        form = EditForm(request.POST, instance=person)
+        if form.is_valid():
+            form.save()
+            return redirect('excel:upload-view')
+        context = {
+            'form': form,
+            'person': person,
+        }
+        return render(request, 'excel/edit.html', context)

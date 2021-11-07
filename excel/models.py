@@ -16,3 +16,5 @@ class XlsxData(models.Model):
     Salary = models.CharField(max_length=10)
     Employee_ID = models.CharField(max_length=6)
 
+    def __str__(self):
+        return f"{self.First_name} {self.Last_name} {self.Start_date}"
