@@ -2,7 +2,8 @@ from django.shortcuts import render, redirect
 from .forms import XlsxModelForm, EditForm
 from .models import Xlsx, XlsxData
 import openpyxl
-from datetime import datetime
+import datetime
+from django.contrib import messages
 
 def upload_file_view(request):
     form = XlsxModelForm(request.POST or None, request.FILES or None)
@@ -14,6 +15,7 @@ def upload_file_view(request):
         wb = openpyxl.load_workbook(excel_file)
         ws = wb.active
         excel_data = []
+
         for i, row in enumerate(ws.iter_rows(min_row=2, max_row=ws.max_row), start=2):
             row_data = []
             for cell in row:
@@ -24,20 +26,20 @@ def upload_file_view(request):
                 else:
                     break
             excel_data.append(row_data)
+        obj.activated = True
+        obj.save()
         for i in range(len(excel_data)):
             XlsxData.objects.create(
                 First_name=excel_data[i][0],
                 Last_name = excel_data[i][1],
                 Mobile = excel_data[i][2],
-                Start_date = '2012-02-03',
-                #int(datetime(excel_data[i][3]).strftime("#y/#%m/%d")),
+                Start_date = datetime.datetime.strptime(excel_data[i][3], "%d/%m/%Y").date() if isinstance(excel_data[i][3], str) else excel_data[i][3].date(),
                 Salary = excel_data[i][5],
                 Employee_ID = excel_data[i][6],
 
             )
 
-        obj.activated = True
-        obj.save()
+
     contex = {
         'form': form,
         'Xlsx': XlsxData.objects.order_by('-id'),
